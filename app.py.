@@ -1,0 +1,79 @@
+import os
+import streamlit as st # type: ignore
+from dotenv import load_dotenv # type: ignore
+from google import genai
+from google.genai import types # type: ignore
+
+# Load environment variables from .env
+load_dotenv()
+
+st.set_page_config(page_title="AI Story Generator", page_icon="📖", layout="centered")
+
+st.title("📖 AI Story Generator")
+st.caption("Powered by Google Gemini 2.5 Flash")
+
+# Validate API Key
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key or api_key == "your_google_gemini_api_key_here":
+    st.warning("Please set your valid GEMINI_API_KEY inside the .env file and restart the app.")
+    st.stop()
+
+# Initialize Gemini client (automatically reads GEMINI_API_KEY from environment)
+client = genai.Client(api_key=api_key)
+
+# Story configuration inputs
+col1, col2, col3 = st.columns(3)
+with col1:
+    genre = st.selectbox(
+        "Genre",
+        ["Sci-Fi", "Fantasy", "Mystery", "Thriller", "Adventure", "Horror", "Slice of Life"]
+    )
+with col2:
+    tone = st.selectbox(
+        "Tone",
+        ["Imaginative", "Dark & Gritty", "Humorous", "Emotional", "Suspenseful", "Whimsical"]
+    )
+with col3:
+    length = st.selectbox(
+        "Length",
+        ["Flash Fiction (~200 words)", "Short Story (~500 words)", "Detailed Tale (~1000 words)"]
+    )
+
+prompt = st.text_area(
+    "Story Idea / Prompt",
+    placeholder="e.g., A clockmaker discovers that every watch he repairs rewinds its owner's regrets...",
+    height=110
+)
+
+if st.button("Generate Story", type="primary", use_container_width=True):
+    if not prompt.strip():
+        st.error("Please enter a story idea or prompt first.")
+    else:
+        system_instruction = (
+            "You are a master fiction writer. Write engaging, vivid, well-paced stories "
+            "with a compelling title formatted as a Markdown H2 heading (## Title)."
+        )
+        user_prompt = (
+            f"Write a {length} {genre} story with a {tone} tone based on this idea:\n\n{prompt}"
+        )
+
+        with st.spinner("Crafting your story..."):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=user_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.85,
+                    ),
+                )
+                st.divider()
+                st.markdown(response.text)
+                st.download_button(
+                    label="Download Story (.md)",
+                    data=response.text,
+                    file_name="generated_story.md",
+                    mime="text/markdown",
+                )
+            except Exception as e:
+                st.error(f"Error generating story: {e}")
